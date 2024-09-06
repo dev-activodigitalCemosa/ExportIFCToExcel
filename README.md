@@ -11,8 +11,8 @@ pip install ifcopenshell openpyxl customtkinter tqdm
 ```
 ```markdown
 Librerías utilizadas:
-ifcopenshell: Permite leer, escribir y procesar archivos IFC.
-openpyxl: Manejo de archivos Excel (.xlsx).
+- ifcopenshell: Permite leer, escribir y procesar archivos IFC.
+- openpyxl: Manejo de archivos Excel (.xlsx).
 pandas: Manipulación de datos en DataFrames.
 customtkinter: Creación de una interfaz gráfica más moderna con Tkinter.
 tqdm: Proporciona barras de progreso.
