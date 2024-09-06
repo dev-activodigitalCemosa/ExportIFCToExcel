@@ -32,36 +32,56 @@ pip install ifcopenshell openpyxl customtkinter tqdm
   
 ## Funcionalidades de procesamiento:
 
-```phyton
-get_entities_filtered(ifcschema_entities, get_types): #Filtra las entidades IFC en función de si se desea obtener tipos (get_types=True) o no. Ignora algunas entidades que no son relevantes.
+```python
+#Filtra las entidades IFC en función de si se desea obtener tipos (get_types=True) o no. Ignora
+#algunas entidades que no son relevantes.
+get_entities_filtered(ifcschema_entities, get_types):
 
-get_ents_info_to_df(ifc_entName): #Obtiene información detallada sobre una entidad IFC y la organiza en un DataFrame. Extrae información básica, propiedades, contenedores y coordenadas de las entidades.
+#Obtiene información detallada sobre una entidad IFC y la organiza en un DataFrame. Extrae
+#información básica, propiedades, contenedores y coordenadas de las entidades.
+get_ents_info_to_df(ifc_entName): 
 
-contract_entName(entName, trunc_n=3): #Contrae el nombre de una entidad para que no exceda un número de caracteres, lo cual es útil para nombres largos en Excel.
+#Contrae el nombre de una entidad para que no exceda un número de caracteres,
+#lo cual es útil para nombres largos en Excel.
+contract_entName(entName, trunc_n=3):
 
-create_ws(wb, ws_name): #Crea una hoja de trabajo (worksheet) en el archivo Excel con el nombre proporcionado. Si el nombre ya existe, le añade un sufijo para hacerlo único.
+#Crea una hoja de trabajo (worksheet) en el archivo Excel con el nombre proporcionado.
+#Si el nombre ya existe, le añade un sufijo para hacerlo único.
+create_ws(wb, ws_name):
 
-create_ws_and_table(wb, ifc_entName, table_suffix_counter={}): #Crea una hoja de trabajo y una tabla en el archivo Excel para una entidad IFC dada. Inserta los datos de la entidad y ajusta el formato de la tabla.
+ #Crea una hoja de trabajo y una tabla en el archivo Excel para una entidad IFC dada.
+ #Inserta los datos de la entidad y ajusta el formato de la tabla.
+create_ws_and_table(wb, ifc_entName, table_suffix_counter={}):
 
-remove_ws(wb, ws_name="Sheet"): #Elimina una hoja específica del archivo Excel si existe.
+#Elimina una hoja específica del archivo Excel si existe.
+remove_ws(wb, ws_name="Sheet"):
 
-purge_wb(wb): #Elimina todas las hojas y tablas de un archivo Excel para comenzar con una plantilla limpia.
+#Elimina todas las hojas y tablas de un archivo Excel para comenzar con una plantilla limpia.
+purge_wb(wb):
 
-get_excel_column_letter(n): #Convierte un número de columna en su correspondiente letra de Excel (por ejemplo, 1 -> 'A', 26 -> 'Z').
+#Convierte un número de columna en su correspondiente letra de Excel.
+get_excel_column_letter(n): 
 ```
 
 ## Interfaz Gráfica:
-```phyton
-select_ifc_file(): #Abre un cuadro de diálogo para seleccionar un archivo IFC y muestra el nombre del archivo seleccionado en la interfaz.
+```python
+#Abre un cuadro de diálogo para seleccionar un archivo IFC y
+#muestra el nombre del archivo seleccionado en la interfaz.
+select_ifc_file(): 
 
-select_destination_folder(): #Abre un cuadro de diálogo para seleccionar una carpeta de destino donde se guardará el archivo Excel generado.
+#Abre un cuadro de diálogo para seleccionar una carpeta de destino
+#donde se guardará el archivo Excel generado.
+select_destination_folder():
 
-start_processing_thread(): #Inicia un nuevo hilo para procesar el archivo IFC y deshabilita los botones durante la ejecución.
+#Inicia un nuevo hilo para procesar el archivo IFC y deshabilita los botones durante la ejecución.
+start_processing_thread(): 
 
-process_ifc_file(): #Ejecuta el proceso de lectura del archivo IFC, filtra las entidades y crea el archivo Excel correspondiente. Incluye manejo de errores y muestra el progreso en la barra de progreso.
+#Ejecuta el proceso de lectura del archivo IFC, filtra las entidades y crea el archivo
+#Excel correspondiente. Incluye manejo de errores y muestra el progreso en la barra de progreso.
+process_ifc_file(): 
 
-enable_buttons(): #Habilita los botones de la interfaz después de que el procesamiento ha terminado.
-
+#Habilita los botones de la interfaz después de que el procesamiento ha terminado.
+enable_buttons(): 
 ```
 
 ## Flujo del Programa:
