@@ -13,7 +13,7 @@ import re
 from tqdm import trange
 from time import sleep
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import Toplevel, Scrollbar, IntVar, Checkbutton, filedialog, messagebox
 import threading
 import logging
 
@@ -22,12 +22,13 @@ ctk.set_appearance_mode("System")  # "System", "Dark", "Light"
 ctk.set_default_color_theme("blue")  # "blue", "green", "dark-blue"
 
 # FUNCIONES ORIGINALES
+entity_properties = []
 
 def get_entities_filtered(ifcschema_entities, get_types):
     # ents_not_collect = ["IfcGeometricRepresentationItem", "IfcObject",
     #                     "IfcObjectDefinition", "IfcProduct", "IfcRelationship",
     #                     "IfcRepresentationItem", "IfcRoot", "IfcCarPoiLisD"]
-    ents_not_collect = ["IfcColumn","IfcElement"]
+    ents_not_collect = ["IfcElement"]
 
     if get_types:
         ents = [e for e in ifcschema_entities if "type" in e.lower()]
@@ -35,9 +36,18 @@ def get_entities_filtered(ifcschema_entities, get_types):
         ents = [e for e in ifcschema_entities if "type" not in e.lower() and e in ents_not_collect]
     return (len(ents), ents)
 
+def get_entity_properties(ifc_entName):
+    entities = ifc_file.by_type(ifc_entName)
+    global entity_properties
+    entity_properties = []
+    for en in entities:
+        props = ifcopenshell.util.element.get_psets(en)
+        filtered_props = {key: value for key, value in props.items() if 'Pset' not in key}
+        entity_properties.append(filtered_props)
+    entity_properties = pd.json_normalize(entity_properties)
+    return entity_properties
 
-
-def get_ents_info_to_df(ifc_entName):
+def get_ents_info_to_df(ifc_entName,df):
     #campos a filtrar
     fields_to_exclude = ['Description','ObjectPlacement','Representation']
     # Obtener la información básica
@@ -45,26 +55,10 @@ def get_ents_info_to_df(ifc_entName):
     entity_info = [en.get_info() for en in entities]
     entity_container = [ifcopenshell.util.element.get_container(en) for en in entities]
     entity_coord = [ifcopenshell.util.placement.get_local_placement(en.ObjectPlacement)[:,3][:3] for en in entities]
-
-    entity_properties = []
-    for en in entities:
-        props = ifcopenshell.util.element.get_psets(en)
-        filtered_props = {key: value for key, value in props.items() if 'Pset' not in key}
-        entity_properties.append(filtered_props)
     
-
-    # Crear un DataFrame con MultiIndex en columnas
-
-    # if not df_props_expanded.empty:
-    #     # Obtener los niveles del MultiIndex a partir de las columnas existentes
-    #     columns = df_props_expanded.columns
-    #     tuples = [col.split('.', 1) for col in columns]
-    #     multi_index = pd.MultiIndex.from_tuples(tuples, names=['Category', 'Property'])
-    #     df_props_expanded.columns = multi_index
     
     # Crear DataFrames
     df_info = pd.DataFrame(entity_info)
-    df_props_expanded = pd.json_normalize(entity_properties)
     df_container = pd.DataFrame(entity_container, columns=['Location'])
     df_coord = pd.DataFrame(entity_coord, columns=['X', 'Y', 'Z'])  # Nombrar las columnas XYZ
 
@@ -74,7 +68,7 @@ def get_ents_info_to_df(ifc_entName):
         df_info = df_info[existing_fields]
 
     # Concatenar los DataFrames
-    combined_df = pd.concat([df_info, df_props_expanded, df_container, df_coord], axis=1)
+    combined_df = pd.concat([df_info,df, df_container, df_coord], axis=1)
     
     return combined_df
 
@@ -89,30 +83,8 @@ def create_ws(wb, ws_name):
         ws = wb.create_sheet(title=ws_name)
     return ws
 
-# def create_ws_and_table(wb, ifc_entName, table_suffix_counter={}):
-#     df = get_ents_info_to_df(ifc_entName)
-#     if len(ifc_entName) > 20:
-#         ifc_entName = contract_entName(ifc_entName, trunc_n=3)
-#     ws = create_ws(wb, ifc_entName)
-#     for row in dataframe_to_rows(df, index=False, header=True):
-#         ws.append([str(v) if str(v).startswith('#') or '(' in str(v) else v for v in row])
-#     df_shape = df.shape
-#     last_column_letter = get_excel_column_letter(df_shape[1] - 1)
-#     tbl_xl_rangeAddress = f"A1:{last_column_letter}{df_shape[0] + 1}"
-#     if not re.match(r'^[A-Z]{1,3}\d+:[A-Z]{1,3}\d+$', tbl_xl_rangeAddress):
-#         raise ValueError(f"Invalid range address generated: {tbl_xl_rangeAddress}")
-#     base_table_name = ifc_entName
-#     suffix = table_suffix_counter.get(base_table_name, 0)
-#     unique_table_name = f"{base_table_name}_{suffix}"
-#     table_suffix_counter[base_table_name] = suffix + 1
-#     tbl = Table(displayName=unique_table_name, ref=tbl_xl_rangeAddress)
-#     style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=True)
-#     tbl.tableStyleInfo = style
-#     ws.add_table(tbl)
-#     return True
-
-def create_ws_and_table(wb, ifc_entName, table_suffix_counter={}):
-    df = get_ents_info_to_df(ifc_entName)
+def create_ws_and_table(wb,df, ifc_entName, table_suffix_counter={}):
+    df = get_ents_info_to_df(ifc_entName,df)
     
     if len(ifc_entName) > 20:
         ifc_entName = contract_entName(ifc_entName, trunc_n=3)
@@ -227,8 +199,9 @@ def process_ifc_file():
             except RuntimeError as e:
                 console_output.insert(ctk.END, f"Advertencia: {e} - Entidad '{en}' ignorada.\n")
         ents = get_entities_filtered(entities_names_in_use, get_types=ifc_getTypes)
-        xls_filename = os.path.join(destination_folder, datetime.now().strftime("%Y-%m-%d") + f"_{ifc_filename}_entTypes_{str(ifc_getTypes)}_2.xlsx")
 
+
+        xls_filename = os.path.join(destination_folder, datetime.now().strftime("%Y-%m-%d") + f"_{ifc_filename}_entTypes_{str(ifc_getTypes)}_2.xlsx")
         wb = Workbook()
         purge_wb(wb)
 
@@ -236,11 +209,14 @@ def process_ifc_file():
         t = trange(len(ents[1]), desc='Entity: ', leave=True)
         progress_bar.set(0)
         total_ents = len(ents[1])
+
         for i, en in zip(t, ents[1]):
             t.set_description(f"Entity: {en}")
             t.refresh()
-            create_ws_and_table(wb, en, table_suffix_counter)
-            # Calcula el progreso actual y actualiza la barra de progreso
+            get_entity_properties(en)
+            filtered_df = open_pset_selection()
+            create_ws_and_table(wb,filtered_df, en, table_suffix_counter)
+                # Calcula el progreso actual y actualiza la barra de progreso
             progress = (i + 1) / total_ents
             progress_bar.set(progress)  # Actualiza la barra de progreso
             progress_bar.update_idletasks()
@@ -248,6 +224,9 @@ def process_ifc_file():
         remove_ws(wb, ws_name="Sheet")
         wb.save(xls_filename)
         console_output.insert(ctk.END, f"Archivo {xls_filename} ha sido guardado exitosamente!\n")
+
+        # Muestra la ventana emergente para selección de propiedades
+        
     except Exception as e:
         logging.error(f"Error durante el procesamiento: {str(e)}")
     finally:
@@ -258,6 +237,76 @@ def enable_buttons():
     btn_select_file.configure(state=ctk.NORMAL)
     btn_select_folder.configure(state=ctk.NORMAL)
     btn_process.configure(state=ctk.NORMAL)
+
+def open_pset_selection():
+ 
+    # Crear la ventana emergente
+    pset_window = ctk.CTkToplevel(app)
+    pset_window.title("Seleccionar Propiedades (Psets)")
+    pset_window.geometry("450x650")
+    pset_window.attributes("-topmost", True)
+    # Obtener el tamaño y posición de la ventana principal
+    app_width = app.winfo_width()
+    app_height = app.winfo_height()
+    app_x = app.winfo_rootx()
+    app_y = app.winfo_rooty()
+    
+    # Obtener el tamaño de la ventana emergente
+    window_width = 450
+    window_height = 650
+    
+    # Calcular la posición central
+    x = app_x + (app_width - window_width) // 2
+    y = app_y + (app_height - window_height) // 2
+    
+    # Ajustar la posición de la ventana emergente
+    pset_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
+    # Crear un frame con scroll para los checkboxes
+    frame_canvas = ctk.CTkFrame(pset_window)
+    frame_canvas.pack(fill="both", expand=True, padx=10, pady=10)
+
+    canvas = ctk.CTkCanvas(frame_canvas,bg="#2b2b2b",highlightthickness=0)  # Sin bordes y fondo igual al de la ventana
+    canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+
+    scrollbar = ctk.CTkScrollbar(frame_canvas, command=canvas.yview, orientation="vertical")
+    scrollbar.pack(side="right", fill="y",padx=5, pady=5)
+    
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    # Crear un frame para los checkboxes dentro del canvas
+    checkbox_frame = ctk.CTkFrame(canvas)
+    canvas.create_window((0, 0), window=checkbox_frame, anchor="nw")
+
+    # Variable para almacenar los valores de los checkboxes
+    selected_psets = {}
+    global entity_properties
+    # Crear un checkbox para cada `pset`
+    for i, pset in enumerate(entity_properties):
+        selected_psets[pset] = IntVar(value=1)  # Todos seleccionados por defecto
+        checkbox = Checkbutton(checkbox_frame, text=pset, variable=selected_psets[pset],
+                               onvalue=1, offvalue=0, font=("Helvetica", 12),  # Ajusta la fuente
+                               bg="#2b2b2b", fg="white", selectcolor="#1a73e8", activebackground="#2b2b2b")
+        checkbox.pack(anchor="w", pady=2)  # Añade espacio vertical entre checkboxes
+    # Actualizar el tamaño del frame interno en función del contenido
+    checkbox_frame.update_idletasks()
+    canvas.config(scrollregion=canvas.bbox("all"))
+    filtered_df = None
+    
+    # Botón de confirmación
+    def confirm_selection():
+        nonlocal filtered_df
+        selected_columns = [pset for pset, var in selected_psets.items() if var.get() == 1]
+        filtered_df = entity_properties[selected_columns]
+        pset_window.destroy()
+
+    confirm_button = ctk.CTkButton(pset_window, text="Confirmar selección", command=confirm_selection,
+                                   width=200, height=40, fg_color="#1a73e8", text_color="white",
+                                   hover_color="#1451a3")
+    confirm_button.pack(pady=15)
+    app.wait_window(pset_window)
+    return filtered_df
+
 
 # CONFIGURACIÓN DE LA INTERFAZ GRÁFICA
 
